@@ -1,0 +1,6 @@
+; $Id$
+name = Conroyfilter
+description = This module allows web sites to easily serve content whilst circumventing the Australian mandatory internet filter.
+package = Censorship
+core = 6.x
+dependencies[] = block
