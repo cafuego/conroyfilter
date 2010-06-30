@@ -1,0 +1,9 @@
+<?php
+// $Id$
+
+/**
+ * Implementation of hook_uninstall()
+ */
+function conroyfilter_uninstall() {
+  db_query("DELETE FROM {variable} WHERE name LIKE 'conroyfilter%'");
+}
