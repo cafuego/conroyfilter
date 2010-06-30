@@ -34,8 +34,9 @@ function conroyfilter_block($op = 'list', $delta = 0, $edit = array()) {
       '#title' => t('Alternate Port'),
       '#description' => t('Which alternate port number does this web server serve content on? Leave blank or set to 0 to disable.'),
       '#default_value' => variable_get('conroyfilter_port', ''),
+      '#maxlength' => 6,
+      '#size' => 6,
     );
-    $form['#validate'][] = 'conroyfilter_block_validate';
     return $form;
   }
 
@@ -46,38 +47,73 @@ function conroyfilter_block($op = 'list', $delta = 0, $edit = array()) {
       variable_set('conroyfilter_port', '');
       return;
     }
-    else {
-      $port = intval($edit['port']);
-      if ($port > 0 && $port < 65535) {
-        variable_set('conroyfilter_port', $port);
-      }
-      else {
-        form_set_error('port', t('The port number must be a positive integer between 1 and 65535.'));
-      }
-    }
+    variable_set('conroyfilter_port', $edit['port']);
   }
 
   // View the block.
   //
   if ($op == 'view' && $delta == 0) {
+    // Don't offer an alternate if the page is a result of a POST action.
+    if ($_POST) {
+      return;
+    }
+
     $conroyfilter_port = variable_get('conroyfilter_port', '');
     if (!empty($conroyfilter_port)) {
 
+      $filter = (intval($_SERVER['SERVER_PORT']) == 80) ? t('filter-free') : t('filtered');
+
       // Obtain the site url.
       $site = substr_replace(url('<front>', array('absolute' => TRUE, 'alias' => TRUE)), '', -1);
-
-      // Chop the port number, if set.
+      // Chop off the port number, if set.
       $site = str_replace(':' . $_SERVER['SERVER_PORT'], '', $site);
 
+      // Determine port number to link to, if any.
       $port = (intval($_SERVER['SERVER_PORT']) == 80) ? ':' . $conroyfilter_port : '';
-      $page = url(implode('/', arg()));
-      $filter = (intval($_SERVER['SERVER_PORT']) == 80) ? 'filter-free' : 'filtered';
+
+      // Get the path of the page we want.
+      $path = !empty($_REQUEST['q']) ? $_REQUEST['q'] : '';
+
+      // Get the rest of the query_string, if present.
+      $query = trim(str_replace('q='. $path, '', $_SERVER['QUERY_STRING']),'&');
+
+      // Rewrite the path and stick the rest of the query string back on, if there is one.
+      $path = url($path);
+      if (!empty($query)) {
+        $path .= (strpos($path, '?') !== FALSE ? '&' : '?') . $query;
+      }
+
+      // Make this all a pretty link, so we can eventually theme this.
+      $link = $site . $port . $path;
 
       $subject = t('Conroy Filter');
-      $content = t('A <a href="@site@port@page">mandatory internet @filter version</a> of this page is also available.',
-        array('@filter' => $filter, '@site' => $site, '@port' => $port, '@page' => $page));
+      $content = t('A <a href="@link">mandatory internet @filter version</a> of this page is also available.',
+        array('@filter' => $filter, '@link' => $link));
 
       return array('subject' => $subject, 'content' => $content);
+    }
+  }
+}
+
+/**
+ * Implementation of hook_FORM_ID_alter().
+ *
+ * Inject a validate hook into the block form.
+ */
+function conroyfilter_form_block_admin_configure_alter(&$form, $form_state) {
+  if ($form['module']['#value'] == 'conroyfilter' && $form['delta']['#value'] == 0) {
+    $form['#validate'][] = 'conroyfilter_block_validate';
+  }
+}
+
+/**
+ * Validate function for the port number.
+ */
+function conroyfilter_block_validate($forme, &$form_state) {
+  if (!empty($form_state['values']['port'])) {
+    $port = (int) $form_state['values']['port'];
+    if ($port < 1 || $port > 65535) {
+      form_set_error('port', t('The port number must be a positive integer between 1 and 65535.'));
     }
   }
 }
